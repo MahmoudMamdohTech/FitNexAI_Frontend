@@ -1,12 +1,9 @@
 // FitNex AI — Unified API Client
-// Microservice Architecture: Routes 'analyze' traffic to Hugging Face, everything else to Render.
-const CORE_URL = import.meta.env.VITE_CORE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const VISION_URL = import.meta.env.VITE_VISION_API_URL || CORE_URL;
+// Single Backend: Everything routes to Hugging Face
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 async function apiFetch(path, options = {}) {
-  // Route /analyze requests to Hugging Face, all other requests to Render Core API
-  const baseUrl = path.includes('/analyze') ? VISION_URL : CORE_URL;
-  const url = `${baseUrl}${path}`;
+  const url = `${BASE_URL}${path}`;
   const token = localStorage.getItem('fitnex_token');
 
   const headers = { 'Content-Type': 'application/json' };
