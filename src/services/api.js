@@ -1,9 +1,12 @@
 // FitNex AI — Unified API Client
-// Single client for all backend calls. JWT is auto-attached.
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Microservice Architecture: Routes 'analyze' traffic to Hugging Face, everything else to Render.
+const CORE_URL = import.meta.env.VITE_CORE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const VISION_URL = import.meta.env.VITE_VISION_API_URL || CORE_URL;
 
 async function apiFetch(path, options = {}) {
-  const url = `${BASE_URL}${path}`;
+  // Route /analyze requests to Hugging Face, all other requests to Render Core API
+  const baseUrl = path.includes('/analyze') ? VISION_URL : CORE_URL;
+  const url = `${baseUrl}${path}`;
   const token = localStorage.getItem('fitnex_token');
 
   const headers = { 'Content-Type': 'application/json' };
