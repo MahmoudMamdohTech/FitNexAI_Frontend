@@ -99,6 +99,8 @@ const AiCamera = () => {
   const activeExerciseRef = useRef(selectedExercise);
   const landmarksRef = useRef(null); // latest landmarks for rAF drawing
   const rafIdRef = useRef(null);
+  const seqCounterRef = useRef(0);
+  const lastProcessedSeqRef = useRef(-1);
 
   const releaseCameraStream = useCallback(() => {
     if (streamRef.current) {
@@ -217,13 +219,10 @@ const AiCamera = () => {
     }
   };
 
-  // frame analysis loop with adaptive throttling
+  // frame analysis loop with continuous asynchronous polling
   useEffect(() => {
     if (!isRunning || !isCameraReady) return undefined;
 
-    const BASE_INTERVAL = 0;    // fetch as fast as network allows
-    const SLOW_INTERVAL = 100;  // minimal fallback
-    let currentInterval = BASE_INTERVAL;
     let timeoutId = null;
 
     const analyzeNextFrame = async () => {
@@ -245,34 +244,39 @@ const AiCamera = () => {
               const imageSrc = canvas.toDataURL('image/jpeg', 0.3);
               if (imageSrc) {
                 const frameB64 = imageSrc.split(',')[1];
-                const result = await gymService.analyzeFrame(
+                const currentSeq = seqCounterRef.current++;
+
+                // FIRE AND FORGET: Don't wait for the network!
+                gymService.analyzeFrame(
                   sessionIdRef.current,
                   activeExerciseRef.current,
                   frameB64
-                );
-
-                // update landmarks
-                landmarksRef.current = result.landmarks || null;
-
-                // single dispatch instead of 6 separate setStates
-                dispatch({ type: 'UPDATE', payload: result });
-
-                // slow down if backend is struggling
-                currentInterval = (result.processing_ms > 150) ? SLOW_INTERVAL : BASE_INTERVAL;
+                ).then(result => {
+                  // Only update the screen if this response is newer than the last one we drew
+                  if (currentSeq > lastProcessedSeqRef.current) {
+                    lastProcessedSeqRef.current = currentSeq;
+                    landmarksRef.current = result.landmarks || null;
+                    dispatch({ type: 'UPDATE', payload: result });
+                  }
+                }).catch(err => {
+                  console.warn('Frame dropped or network error', err);
+                });
               }
             }
           } catch (err) {
             setAnalysisError(err.message || 'Failed to analyze camera frame.');
           } finally {
+            // Unlock immediately so the next frame can process!
             analyzeLockRef.current = false;
           }
         }
       }
 
-      timeoutId = setTimeout(analyzeNextFrame, currentInterval);
+      // Force exactly 10 FPS (100ms) regardless of network latency
+      timeoutId = setTimeout(analyzeNextFrame, 100);
     };
 
-    timeoutId = setTimeout(analyzeNextFrame, currentInterval);
+    timeoutId = setTimeout(analyzeNextFrame, 100);
     return () => { if (timeoutId) clearTimeout(timeoutId); };
   }, [isRunning, isCameraReady]);
 
