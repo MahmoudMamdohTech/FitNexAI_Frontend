@@ -8,17 +8,24 @@ export const gymService = {
   },
 
   async analyzeFrame(sessionId, exercise, frameB64) {
-    return await api.post('/api/v1/analyze', {
-      session_id: sessionId,
-      exercise,
-      frame_b64: frameB64,
+    const aiUrl = import.meta.env.VITE_AI_URL;
+    const res = await fetch(`${aiUrl}/api/v1/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, exercise, frame_b64: frameB64 }),
     });
+    if (!res.ok) throw new Error('AI analysis failed');
+    return await res.json();
   },
 
   async resetSession(sessionId) {
-    return await api.post('/api/v1/reset-session', {
-      session_id: sessionId,
+    const aiUrl = import.meta.env.VITE_AI_URL;
+    const res = await fetch(`${aiUrl}/api/v1/reset-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
     });
+    return await res.json();
   },
 
   // user_id comes from JWT on the server
